@@ -4,22 +4,14 @@ import LocationPicker from "./components/LocationPicker";
 import SceneViewer from "./components/SceneViewer";
 import ShadowHistogram from "./components/ShadowHistogram";
 import { instantShadow, simulateYearly, loadSample } from "./api/client";
+import type { DayData, MeshInfo } from "./types";
 import "./App.css";
 
 type Metric = "peak_area" | "total_area_hours" | "hours_shaded";
 
-interface DayData {
-  day: number;
-  date: string;
-  month: number;
-  peak_area: number;
-  total_area_hours: number;
-  hours_shaded: number;
-}
-
 export default function App() {
   const [meshId, setMeshId] = useState<string | null>(null);
-  const [meshInfo, setMeshInfo] = useState<any | null>(null);
+  const [meshInfo, setMeshInfo] = useState<MeshInfo | null>(null);
   const [lat, setLat] = useState(32.08);
   const [lon, setLon] = useState(34.78);
   const [datetime, setDatetime] = useState(() => {
@@ -56,7 +48,7 @@ export default function App() {
     }
   }
 
-  function handleUploaded(id: string, info: any) {
+  function handleUploaded(id: string, info: MeshInfo) {
     setMeshId(id);
     setMeshInfo(info);
     fetchInstant(id, lat, lon, datetime);

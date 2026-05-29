@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { getMeshGeometry } from "../api/client";
+import type { MeshInfo } from "../types";
 
 interface Props {
   meshId?: string | null;
-  meshInfo?: { size: { width: number; height: number; depth: number } } | null;
+  meshInfo?: MeshInfo | null;
   shadowPolygon: number[][] | null;
   sunAzimuth: number;
   sunAltitude: number;
@@ -14,6 +15,7 @@ interface Props {
 export default function SceneViewer({ meshId, meshInfo, shadowPolygon, sunAzimuth, sunAltitude }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sunRadiusRef = useRef(30);
+  const raycasterRef = useRef(new THREE.Raycaster());
   const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
@@ -276,7 +278,7 @@ export default function SceneViewer({ meshId, meshInfo, shadowPolygon, sunAzimut
     const rect = canvas.getBoundingClientRect();
     const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    const raycaster = new THREE.Raycaster();
+    const raycaster = raycasterRef.current;
     raycaster.setFromCamera(new THREE.Vector2(nx, ny), ctx.camera);
     const hits = raycaster.intersectObject(ctx.meshObj);
     if (hits.length > 0) {

@@ -1,5 +1,4 @@
 import io
-import tempfile
 import os
 from datetime import datetime, timezone
 from typing import Annotated
@@ -27,6 +26,21 @@ app.add_middleware(
 _mesh_store: dict[str, trimesh.Trimesh] = {}
 
 
+def _mesh_response(mesh_id: str, mesh: trimesh.Trimesh) -> dict:
+    bounds = mesh.bounds.tolist()
+    return {
+        "mesh_id": mesh_id,
+        "vertices": len(mesh.vertices),
+        "faces": len(mesh.faces),
+        "bounds": {"min": bounds[0], "max": bounds[1]},
+        "size": {
+            "width": round(bounds[1][0] - bounds[0][0], 3),
+            "height": round(bounds[1][1] - bounds[0][1], 3),
+            "depth": round(bounds[1][2] - bounds[0][2], 3),
+        },
+    }
+
+
 def _load_mesh(data: bytes, filename: str) -> trimesh.Trimesh:
     ext = os.path.splitext(filename)[1].lower()
     mesh = trimesh.load(io.BytesIO(data), file_type=ext.lstrip("."))
@@ -52,19 +66,7 @@ async def upload_model(file: UploadFile = File(...)):
 
     mesh_id = f"mesh_{len(_mesh_store)}"
     _mesh_store[mesh_id] = mesh
-
-    bounds = mesh.bounds.tolist()
-    return {
-        "mesh_id": mesh_id,
-        "vertices": len(mesh.vertices),
-        "faces": len(mesh.faces),
-        "bounds": {"min": bounds[0], "max": bounds[1]},
-        "size": {
-            "width": round(bounds[1][0] - bounds[0][0], 3),
-            "height": round(bounds[1][1] - bounds[0][1], 3),
-            "depth": round(bounds[1][2] - bounds[0][2], 3),
-        },
-    }
+    return _mesh_response(mesh_id, mesh)
 
 
 @app.post("/shadow/instant")
@@ -146,19 +148,7 @@ def load_sample(name: str = "building"):
 
     mesh_id = f"mesh_sample_{name}"
     _mesh_store[mesh_id] = mesh
-
-    bounds = mesh.bounds.tolist()
-    return {
-        "mesh_id": mesh_id,
-        "vertices": len(mesh.vertices),
-        "faces": len(mesh.faces),
-        "bounds": {"min": bounds[0], "max": bounds[1]},
-        "size": {
-            "width": round(bounds[1][0] - bounds[0][0], 3),
-            "height": round(bounds[1][1] - bounds[0][1], 3),
-            "depth": round(bounds[1][2] - bounds[0][2], 3),
-        },
-    }
+    return _mesh_response(mesh_id, mesh)
 
 
 @app.get("/mesh/{mesh_id}/geometry")

@@ -1,5 +1,8 @@
-from datetime import timezone
+import calendar
+from datetime import datetime, timedelta, timezone
+
 import trimesh
+
 from .sun import sun_position, sun_direction_vector, daylight_samples
 from .shadow import project_shadow
 
@@ -15,7 +18,6 @@ def run_yearly_simulation(
     Simulate shadows for every day of the year.
     Returns list of dicts: {day, date_str, peak_area, total_area, hours_shaded}.
     """
-    import calendar
     days_in_year = 366 if calendar.isleap(year) else 365
     results = []
 
@@ -35,7 +37,6 @@ def run_yearly_simulation(
         else:
             peak = total = hours = 0.0
 
-        from datetime import datetime, timedelta
         date = datetime(year, 1, 1) + timedelta(days=day - 1)
 
         results.append({

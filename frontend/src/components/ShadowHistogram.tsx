@@ -1,14 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
-
-interface DayData {
-  day: number;
-  date: string;
-  month: number;
-  peak_area: number;
-  total_area_hours: number;
-  hours_shaded: number;
-}
+import type { DayData } from "../types";
 
 interface Props {
   data: DayData[];

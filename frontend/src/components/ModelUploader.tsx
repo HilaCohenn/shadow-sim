@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect } from "react";
 import { uploadModel, loadSample, listSamples } from "../api/client";
+import type { MeshInfo } from "../types";
 
 interface Props {
-  onUploaded: (meshId: string, info: any) => void;
+  onUploaded: (meshId: string, info: MeshInfo) => void;
 }
 
 export default function ModelUploader({ onUploaded }: Props) {

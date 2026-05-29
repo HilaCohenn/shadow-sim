@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
-from pysolar.solar import get_altitude, get_azimuth
+import calendar
 import math
+from datetime import datetime, timedelta, timezone
+
+from pysolar.solar import get_altitude, get_azimuth
 
 
 def sun_position(lat: float, lon: float, dt: datetime) -> dict:
@@ -28,9 +30,6 @@ def sun_direction_vector(altitude_deg: float, azimuth_deg: float) -> tuple:
 
 def daylight_samples(lat: float, lon: float, year: int, day_of_year: int, step_minutes: int = 30):
     """Yield UTC datetimes during daylight hours for given day, stepping every step_minutes."""
-    from datetime import timedelta
-    import calendar
-
     start_of_year = datetime(year, 1, 1, tzinfo=timezone.utc)
     base = start_of_year + timedelta(days=day_of_year - 1)
 
