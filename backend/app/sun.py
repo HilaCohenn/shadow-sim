@@ -38,5 +38,5 @@ def daylight_samples(lat: float, lon: float, year: int, day_of_year: int, step_m
         for minute in range(0, 60, step_minutes):
             dt = base.replace(hour=hour, minute=minute)
             alt = get_altitude(lat, lon, dt)
-            if alt > 0:
+            if alt > 5:  # exclude near-horizon angles to avoid unrealistically large shadow projections
                 yield dt
