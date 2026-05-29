@@ -140,6 +140,17 @@ def load_sample():
     }
 
 
+@app.get("/mesh/{mesh_id}/geometry")
+def get_mesh_geometry(mesh_id: str):
+    mesh = _mesh_store.get(mesh_id)
+    if mesh is None:
+        raise HTTPException(404, "Mesh not found")
+    return {
+        "vertices": mesh.vertices.tolist(),
+        "faces": mesh.faces.tolist(),
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

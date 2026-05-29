@@ -25,6 +25,12 @@ export async function instantShadow(meshId: string, lat: number, lon: number, da
   return res.json();
 }
 
+export async function getMeshGeometry(meshId: string): Promise<{ vertices: number[][], faces: number[][] }> {
+  const res = await fetch(`${BASE}/mesh/${meshId}/geometry`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function simulateYearly(meshId: string, lat: number, lon: number, year: number) {
   const fd = new FormData();
   fd.append("mesh_id", meshId);

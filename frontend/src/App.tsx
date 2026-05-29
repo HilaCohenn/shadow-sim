@@ -116,6 +116,22 @@ export default function App() {
               onChange={handleDatetimeChange}
               className="dt-input"
             />
+            <div className="hour-slider-row">
+              <label>Hour: {datetime.slice(11, 13)}:00 UTC</label>
+              <input
+                type="range"
+                min={0}
+                max={23}
+                value={Number(datetime.slice(11, 13))}
+                onChange={(e) => {
+                  const h = e.target.value.padStart(2, "0");
+                  const dt = `${datetime.slice(0, 11)}${h}:00`;
+                  setDatetime(dt);
+                  if (meshId) fetchInstant(meshId, lat, lon, dt);
+                }}
+                className="hour-slider"
+              />
+            </div>
             <p className="status">
               Sun: alt {sunPos.altitude.toFixed(1)}° · az {sunPos.azimuth.toFixed(1)}°
             </p>
@@ -142,7 +158,7 @@ export default function App() {
 
         <main className="scene-area">
           <SceneViewer
-            meshInfo={meshInfo}
+            meshId={meshId}
             shadowPolygon={shadowPolygon}
             sunAzimuth={sunPos.azimuth}
             sunAltitude={sunPos.altitude}

@@ -1,15 +1,16 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { getMeshGeometry } from "../api/client";
 
 interface Props {
-  meshInfo?: any;
+  meshId?: string | null;
   shadowPolygon: number[][] | null;
   sunAzimuth: number;
   sunAltitude: number;
 }
 
-export default function SceneViewer({ shadowPolygon, sunAzimuth, sunAltitude }: Props) {
+export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAltitude }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
@@ -40,7 +41,6 @@ export default function SceneViewer({ shadowPolygon, sunAzimuth, sunAltitude }: 
     camera.position.set(-20, 30, 25);
     camera.lookAt(0, 5, 0);
 
-    // Ground plane
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(60, 60),
       new THREE.MeshLambertMaterial({ color: 0x2d5a27, side: THREE.DoubleSide })
@@ -60,13 +60,6 @@ export default function SceneViewer({ shadowPolygon, sunAzimuth, sunAltitude }: 
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
     scene.add(dirLight);
 
-    const meshObj = new THREE.Mesh(
-      new THREE.BoxGeometry(10, 20, 10),
-      new THREE.MeshLambertMaterial({ color: 0x6688cc })
-    );
-    meshObj.position.y = 10;
-    scene.add(meshObj);
-
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
@@ -85,7 +78,7 @@ export default function SceneViewer({ shadowPolygon, sunAzimuth, sunAltitude }: 
     }
     render();
 
-    sceneRef.current = { renderer, scene, camera, controls, meshObj, shadowMesh, sunSphere, frameId };
+    sceneRef.current = { renderer, scene, camera, controls, meshObj: null, shadowMesh, sunSphere, frameId };
 
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
@@ -106,7 +99,70 @@ export default function SceneViewer({ shadowPolygon, sunAzimuth, sunAltitude }: 
     };
   }, []);
 
-  // Update sun position
+  // Load actual mesh geometry from backend, or show placeholder box when no mesh is loaded
+  useEffect(() => {
+    const ctx = sceneRef.current;
+    if (!ctx) return;
+
+    if (ctx.meshObj) {
+      ctx.scene.remove(ctx.meshObj);
+      ctx.meshObj.geometry.dispose();
+      (ctx.meshObj.material as THREE.Material).dispose();
+      ctx.meshObj = null;
+    }
+
+    if (!meshId) {
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(10, 20, 10),
+        new THREE.MeshLambertMaterial({ color: 0x6688cc })
+      );
+      box.position.y = 10;
+      ctx.scene.add(box);
+      ctx.meshObj = box;
+      return;
+    }
+
+    let cancelled = false;
+    getMeshGeometry(meshId).then(({ vertices, faces }) => {
+      if (cancelled) return;
+      const ctx2 = sceneRef.current;
+      if (!ctx2) return;
+
+      if (ctx2.meshObj) {
+        ctx2.scene.remove(ctx2.meshObj);
+        ctx2.meshObj.geometry.dispose();
+        (ctx2.meshObj.material as THREE.Material).dispose();
+        ctx2.meshObj = null;
+      }
+
+      const positions = new Float32Array(vertices.length * 3);
+      for (let i = 0; i < vertices.length; i++) {
+        positions[i * 3] = vertices[i][0];
+        positions[i * 3 + 1] = vertices[i][1];
+        positions[i * 3 + 2] = vertices[i][2];
+      }
+      const indices = new Uint32Array(faces.length * 3);
+      for (let i = 0; i < faces.length; i++) {
+        indices[i * 3] = faces[i][0];
+        indices[i * 3 + 1] = faces[i][1];
+        indices[i * 3 + 2] = faces[i][2];
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geo.setIndex(new THREE.BufferAttribute(indices, 1));
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshLambertMaterial({ color: 0x6688cc, side: THREE.DoubleSide });
+      const mesh = new THREE.Mesh(geo, mat);
+      ctx2.scene.add(mesh);
+      ctx2.meshObj = mesh;
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [meshId]);
+
+  // Update sun sphere position
   useEffect(() => {
     const ctx = sceneRef.current;
     if (!ctx) return;
@@ -120,7 +176,7 @@ export default function SceneViewer({ shadowPolygon, sunAzimuth, sunAltitude }: 
     );
   }, [sunAzimuth, sunAltitude]);
 
-  // Update shadow polygon
+  // Update shadow polygon overlay
   useEffect(() => {
     const ctx = sceneRef.current;
     if (!ctx) return;
