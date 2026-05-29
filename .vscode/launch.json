@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Uvicorn (backend)",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["backend.app.main:app", "--reload", "--port", "8000"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Frontend: Vite (npm)",
+      "type": "pwa-node",
+      "request": "launch",
+      "command": "npm",
+      "args": ["run", "dev"],
+      "cwd": "${workspaceFolder}/frontend",
+      "runtimeExecutable": "npm",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Attach: Vite (browser)",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run: Backend + Frontend",
+      "configurations": [
+        "Python: Uvicorn (backend)",
+        "Frontend: Vite (npm)"
+      ]
+    }
+  ]
+}
