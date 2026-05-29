@@ -36,7 +36,7 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
 
   useEffect(() => {
-    loadSample()
+    loadSample("building")
       .then((info) => {
         setMeshId(info.mesh_id);
         setMeshInfo(info);
@@ -159,6 +159,7 @@ export default function App() {
         <main className="scene-area">
           <SceneViewer
             meshId={meshId}
+            meshInfo={meshInfo}
             shadowPolygon={shadowPolygon}
             sunAzimuth={sunPos.azimuth}
             sunAltitude={sunPos.altitude}

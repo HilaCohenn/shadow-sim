@@ -1,7 +1,13 @@
 const BASE = "http://localhost:8000";
 
-export async function loadSample() {
-  const res = await fetch(`${BASE}/sample`);
+export async function listSamples(): Promise<{ name: string; label: string }[]> {
+  const res = await fetch(`${BASE}/samples`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function loadSample(name = "building") {
+  const res = await fetch(`${BASE}/sample?name=${name}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

@@ -109,21 +109,42 @@ async def simulate_yearly(
     return {"year": year, "lat": lat, "lon": lon, "days": results}
 
 
+SAMPLES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "samples"))
+SAMPLE_LABELS = {
+    "building": "Office Building",
+    "tower": "Tower",
+    "house": "House",
+    "lshape": "L-Shape",
+    "solar_panel": "Solar Panel",
+    "obelisk": "Obelisk",
+    "pyramid": "Pyramid",
+}
+
+
+@app.get("/samples")
+def list_samples():
+    return [
+        {"name": name, "label": label}
+        for name, label in SAMPLE_LABELS.items()
+        if os.path.exists(os.path.join(SAMPLES_DIR, f"{name}.obj"))
+    ]
+
+
 @app.get("/sample")
-def load_sample():
-    """Load the bundled sample building.obj and return a mesh_id ready for simulation."""
-    sample_path = os.path.join(os.path.dirname(__file__), "..", "..", "samples", "building.obj")
-    sample_path = os.path.abspath(sample_path)
+def load_sample(name: str = "building"):
+    if name not in SAMPLE_LABELS:
+        raise HTTPException(400, f"Unknown sample: {name}")
+    sample_path = os.path.join(SAMPLES_DIR, f"{name}.obj")
     if not os.path.exists(sample_path):
         raise HTTPException(404, "Sample model not found")
     with open(sample_path, "rb") as f:
         data = f.read()
     try:
-        mesh = _load_mesh(data, "building.obj")
+        mesh = _load_mesh(data, f"{name}.obj")
     except Exception as e:
         raise HTTPException(400, f"Mesh load failed: {e}")
 
-    mesh_id = "mesh_sample"
+    mesh_id = f"mesh_sample_{name}"
     _mesh_store[mesh_id] = mesh
 
     bounds = mesh.bounds.tolist()

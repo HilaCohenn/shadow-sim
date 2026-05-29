@@ -1,17 +1,20 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { getMeshGeometry } from "../api/client";
 
 interface Props {
   meshId?: string | null;
+  meshInfo?: { size: { width: number; height: number; depth: number } } | null;
   shadowPolygon: number[][] | null;
   sunAzimuth: number;
   sunAltitude: number;
 }
 
-export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAltitude }: Props) {
+export default function SceneViewer({ meshId, meshInfo, shadowPolygon, sunAzimuth, sunAltitude }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const sunRadiusRef = useRef(30);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
@@ -20,6 +23,8 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
     meshObj: THREE.Mesh | null;
     shadowMesh: THREE.Mesh | null;
     sunSphere: THREE.Mesh;
+    ground: THREE.Mesh;
+    grid: THREE.GridHelper;
     frameId: number;
   } | null>(null);
 
@@ -37,7 +42,7 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a2e);
 
-    const camera = new THREE.PerspectiveCamera(50, (w || 800) / (h || 500), 0.1, 500);
+    const camera = new THREE.PerspectiveCamera(50, (w || 800) / (h || 500), 0.1, 2000);
     camera.position.set(-20, 30, 25);
     camera.lookAt(0, 5, 0);
 
@@ -48,7 +53,9 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
 
-    scene.add(new THREE.GridHelper(60, 30, 0x444444, 0x333333));
+    const grid = new THREE.GridHelper(60, 30, 0x444444, 0x333333);
+    scene.add(grid);
+
     scene.add(new THREE.AmbientLight(0xffffff, 0.4));
 
     const sunSphere = new THREE.Mesh(
@@ -66,7 +73,6 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
     controls.target.set(0, 5, 0);
     controls.update();
 
-    let shadowMesh: THREE.Mesh | null = null;
     let frameId = 0;
     let active = true;
 
@@ -78,7 +84,7 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
     }
     render();
 
-    sceneRef.current = { renderer, scene, camera, controls, meshObj: null, shadowMesh, sunSphere, frameId };
+    sceneRef.current = { renderer, scene, camera, controls, meshObj: null, shadowMesh: null, sunSphere, ground, grid, frameId };
 
     const ro = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
@@ -99,7 +105,7 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
     };
   }, []);
 
-  // Load actual mesh geometry from backend, or show placeholder box when no mesh is loaded
+  // Load mesh geometry and rescale scene to fit
   useEffect(() => {
     const ctx = sceneRef.current;
     if (!ctx) return;
@@ -137,13 +143,13 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
 
       const positions = new Float32Array(vertices.length * 3);
       for (let i = 0; i < vertices.length; i++) {
-        positions[i * 3] = vertices[i][0];
+        positions[i * 3]     = vertices[i][0];
         positions[i * 3 + 1] = vertices[i][1];
         positions[i * 3 + 2] = vertices[i][2];
       }
       const indices = new Uint32Array(faces.length * 3);
       for (let i = 0; i < faces.length; i++) {
-        indices[i * 3] = faces[i][0];
+        indices[i * 3]     = faces[i][0];
         indices[i * 3 + 1] = faces[i][1];
         indices[i * 3 + 2] = faces[i][2];
       }
@@ -157,6 +163,59 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
       const mesh = new THREE.Mesh(geo, mat);
       ctx2.scene.add(mesh);
       ctx2.meshObj = mesh;
+
+      // Scale scene elements to mesh bounding box
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox!;
+      const size = new THREE.Vector3();
+      bb.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      const groundSize = maxDim * 2.5;
+      const gridDivisions = Math.max(10, Math.round(groundSize / 5));
+      const camDist = maxDim * 4;
+      const sunR = camDist * 0.6;
+      sunRadiusRef.current = sunR;
+
+      // Reposition sun sphere immediately with new radius
+      const az2  = (sunAzimuth  * Math.PI) / 180;
+      const alt2 = (sunAltitude * Math.PI) / 180;
+      ctx2.sunSphere.position.set(
+        sunR * Math.sin(az2)  * Math.cos(alt2),
+        sunR * Math.sin(alt2),
+        -sunR * Math.cos(az2) * Math.cos(alt2)
+      );
+      ctx2.sunSphere.geometry.dispose();
+      ctx2.sunSphere.geometry = new THREE.SphereGeometry(sunR * 0.03, 12, 12);
+
+      // Update ground
+      ctx2.scene.remove(ctx2.ground);
+      ctx2.ground.geometry.dispose();
+      ctx2.ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(groundSize, groundSize),
+        new THREE.MeshLambertMaterial({ color: 0x2d5a27, side: THREE.DoubleSide })
+      );
+      ctx2.ground.rotation.x = -Math.PI / 2;
+      ctx2.scene.add(ctx2.ground);
+
+      // Update grid
+      ctx2.scene.remove(ctx2.grid);
+      ctx2.grid = new THREE.GridHelper(groundSize, gridDivisions, 0x444444, 0x333333);
+      ctx2.scene.add(ctx2.grid);
+
+      // Sync aspect from actual canvas before placing camera
+      const canvas2 = canvasRef.current;
+      if (canvas2 && canvas2.clientWidth > 0) {
+        ctx2.camera.aspect = canvas2.clientWidth / canvas2.clientHeight;
+      }
+      // 3/4 perspective view: ~33° elevation from a corner, distance fits full ground
+      ctx2.camera.position.set(groundSize * 0.5, groundSize * 1.15, -groundSize * 1.7);
+      ctx2.camera.near = maxDim * 0.05;
+      ctx2.camera.far = groundSize * 8;
+      ctx2.camera.updateProjectionMatrix();
+      ctx2.controls.target.set(0, size.y * 0.45, 0);
+      ctx2.controls.update();
+
     }).catch(() => {});
 
     return () => { cancelled = true; };
@@ -166,11 +225,11 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
   useEffect(() => {
     const ctx = sceneRef.current;
     if (!ctx) return;
-    const az = (sunAzimuth * Math.PI) / 180;
+    const az  = (sunAzimuth  * Math.PI) / 180;
     const alt = (sunAltitude * Math.PI) / 180;
-    const r = 30;
+    const r   = sunRadiusRef.current;
     ctx.sunSphere.position.set(
-      r * Math.sin(az) * Math.cos(alt),
+      r * Math.sin(az)  * Math.cos(alt),
       r * Math.sin(alt),
       -r * Math.cos(az) * Math.cos(alt)
     );
@@ -190,27 +249,71 @@ export default function SceneViewer({ meshId, shadowPolygon, sunAzimuth, sunAlti
     if (!shadowPolygon || shadowPolygon.length < 3) return;
 
     const shape = new THREE.Shape(shadowPolygon.map(([x, z]) => new THREE.Vector2(x, z)));
-    const geo = new THREE.ShapeGeometry(shape);
-    const mat = new THREE.MeshBasicMaterial({
+    const geo   = new THREE.ShapeGeometry(shape);
+    const mat   = new THREE.MeshBasicMaterial({
       color: 0x000000,
       transparent: true,
       opacity: 0.55,
       side: THREE.DoubleSide,
       depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     });
     const sm = new THREE.Mesh(geo, mat);
-    sm.rotation.x = Math.PI / 2;
-    sm.position.y = 0.1;
+    sm.rotation.x  = Math.PI / 2;
+    sm.position.y  = 0.1;
     sm.renderOrder = 1;
     sm.frustumCulled = false;
     ctx.scene.add(sm);
     ctx.shadowMesh = sm;
   }, [shadowPolygon]);
 
+  function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
+    const ctx = sceneRef.current;
+    if (!ctx || !ctx.meshObj || !meshInfo) { setTooltip(null); return; }
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(new THREE.Vector2(nx, ny), ctx.camera);
+    const hits = raycaster.intersectObject(ctx.meshObj);
+    if (hits.length > 0) {
+      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    } else {
+      setTooltip(null);
+    }
+  }
+
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: "100%", height: "100%", minHeight: 400, display: "block" }}
-    />
+    <div style={{ position: "relative", width: "100%", height: "100%", minHeight: 400 }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: "100%", height: "100%", display: "block" }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setTooltip(null)}
+      />
+      {tooltip && meshInfo && (
+        <div style={{
+          position: "absolute",
+          left: tooltip.x + 14,
+          top: tooltip.y - 10,
+          background: "rgba(0,0,0,0.78)",
+          color: "#fff",
+          padding: "6px 10px",
+          borderRadius: 6,
+          fontSize: 13,
+          pointerEvents: "none",
+          whiteSpace: "nowrap",
+          lineHeight: 1.6,
+          border: "1px solid rgba(255,255,255,0.15)",
+        }}>
+          <div>Width: <b>{meshInfo.size.width} m</b></div>
+          <div>Height: <b>{meshInfo.size.height} m</b></div>
+          <div>Depth: <b>{meshInfo.size.depth} m</b></div>
+        </div>
+      )}
+    </div>
   );
 }
