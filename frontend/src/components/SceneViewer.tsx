@@ -4,6 +4,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { getMeshGeometry } from '../api/client';
 import type { MeshInfo } from '../types';
 
+type TooltipState = {
+  x: number;
+  y: number;
+  type: 'mesh' | 'shadow';
+};
+
 interface Props {
   meshId?: string | null;
   meshInfo?: MeshInfo | null;
@@ -28,7 +34,7 @@ export default function SceneViewer({
     sunAzimuthRef.current = sunAzimuth;
     sunAltitudeRef.current = sunAltitude;
   });
-  const [tooltip, setTooltip] = useState<{ x: number; y: number } | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
@@ -328,7 +334,7 @@ export default function SceneViewer({
 
   function handleMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
     const ctx = sceneRef.current;
-    if (!ctx || !ctx.meshObj || !meshInfo) {
+    if (!ctx) {
       setTooltip(null);
       return;
     }
@@ -338,13 +344,83 @@ export default function SceneViewer({
     const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
     const raycaster = raycasterRef.current;
     raycaster.setFromCamera(new THREE.Vector2(nx, ny), ctx.camera);
-    const hits = raycaster.intersectObject(ctx.meshObj);
-    if (hits.length > 0) {
-      setTooltip({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-    } else {
-      setTooltip(null);
+
+    if (ctx.meshObj && meshInfo) {
+      const meshHits = raycaster.intersectObject(ctx.meshObj);
+      if (meshHits.length > 0) {
+        setTooltip({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          type: 'mesh',
+        });
+        return;
+      }
     }
+
+    if (ctx.shadowMesh && shadowPolygon && shadowPolygon.length >= 3) {
+      const shadowHits = raycaster.intersectObject(ctx.shadowMesh);
+      if (shadowHits.length > 0) {
+        setTooltip({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          type: 'shadow',
+        });
+        return;
+      }
+    }
+
+    setTooltip(null);
   }
+
+  function getShadowSize() {
+    if (!shadowPolygon || shadowPolygon.length < 3) return null;
+
+    const xs = shadowPolygon.map(([x]) => x);
+    const zs = shadowPolygon.map(([, z]) => z);
+
+    return {
+      length: (Math.max(...zs) - Math.min(...zs)).toFixed(2),
+      width: (Math.max(...xs) - Math.min(...xs)).toFixed(2),
+    };
+  }
+
+  function renderTooltipContent() {
+    if (tooltip?.type === 'mesh' && meshInfo) {
+      return (
+        <>
+          <div>
+            Width: <b>{meshInfo.size.width} m</b>
+          </div>
+          <div>
+            Height: <b>{meshInfo.size.height} m</b>
+          </div>
+          <div>
+            Depth: <b>{meshInfo.size.depth} m</b>
+          </div>
+        </>
+      );
+    }
+
+    if (tooltip?.type === 'shadow') {
+      const shadowSize = getShadowSize();
+      if (!shadowSize) return null;
+
+      return (
+        <>
+          <div>
+            Length: <b>{shadowSize.length} m</b>
+          </div>
+          <div>
+            Width: <b>{shadowSize.width} m</b>
+          </div>
+        </>
+      );
+    }
+
+    return null;
+  }
+
+  const tooltipContent = renderTooltipContent();
 
   return (
     <div
@@ -361,7 +437,7 @@ export default function SceneViewer({
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setTooltip(null)}
       />
-      {tooltip && meshInfo && (
+      {tooltip && tooltipContent && (
         <div
           style={{
             position: 'absolute',
@@ -378,15 +454,7 @@ export default function SceneViewer({
             border: '1px solid rgba(255,255,255,0.15)',
           }}
         >
-          <div>
-            Width: <b>{meshInfo.size.width} m</b>
-          </div>
-          <div>
-            Height: <b>{meshInfo.size.height} m</b>
-          </div>
-          <div>
-            Depth: <b>{meshInfo.size.depth} m</b>
-          </div>
+          {tooltipContent}
         </div>
       )}
     </div>
