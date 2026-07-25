@@ -6,6 +6,10 @@ interface Props {
   onUploaded: (meshId: string, info: MeshInfo) => void;
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function ModelUploader({ onUploaded }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string>("");
@@ -29,8 +33,8 @@ export default function ModelUploader({ onUploaded }: Props) {
       const info = await uploadModel(file);
       setStatus(`Loaded: ${info.vertices} vertices, ${info.faces} faces`);
       onUploaded(info.mesh_id, info);
-    } catch (err: any) {
-      setStatus(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      setStatus(`Error: ${getErrorMessage(err)}`);
     } finally {
       setLoading(false);
     }
@@ -44,8 +48,8 @@ export default function ModelUploader({ onUploaded }: Props) {
     try {
       const info = await loadSample(name);
       onUploaded(info.mesh_id, info);
-    } catch (err: any) {
-      setStatus(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      setStatus(`Error: ${getErrorMessage(err)}`);
     } finally {
       setLoading(false);
     }

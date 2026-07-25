@@ -9,6 +9,10 @@ import "./App.css";
 
 type Metric = "peak_area" | "total_area_hours" | "hours_shaded";
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function App() {
   const [meshId, setMeshId] = useState<string | null>(null);
   const [meshInfo, setMeshInfo] = useState<MeshInfo | null>(null);
@@ -35,7 +39,7 @@ export default function App() {
         fetchInstant(info.mesh_id, lat, lon, datetime);
       })
       .catch(() => {});
-  }, []);
+  }, [datetime, lat, lon]);
 
   async function fetchInstant(mid: string, la: number, lo: number, dt: string) {
     if (!mid) return;
@@ -73,8 +77,8 @@ export default function App() {
     try {
       const res = await simulateYearly(meshId, lat, lon, 2024);
       setYearlyData(res.days);
-    } catch (err: any) {
-      setSimError(err.message);
+    } catch (err: unknown) {
+      setSimError(getErrorMessage(err));
     } finally {
       setSimLoading(false);
     }
